@@ -6,7 +6,7 @@
 <title>Glass Form Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&family=Hanken+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&family=Hanken+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
     --bg: #f4f5f8;
@@ -20,17 +20,47 @@
     --divider: rgba(0, 0, 0, 0.06);
     --hover: rgba(0, 0, 0, 0.03);
     --active: rgba(0, 0, 0, 0.06);
+    --stage-bg: #fafbfd;
+    --range-track: rgba(0, 0, 0, 0.1);
+  }
+  /* Dark theme — token-only override. Every UI element pulls from
+     these vars, so flipping data-theme on <html> retints the whole
+     interface without component-level changes. The 3D scene's own
+     background (Light/Dark/None radio in the Background section) is
+     intentionally independent — that affects the render, this affects
+     the UI chrome. */
+  [data-theme="dark"] {
+    --bg: #0e0f12;
+    --panel: rgba(20, 22, 26, 0.85);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --text: #ececf0;
+    --text-dim: #9a9aa3;
+    --text-faint: #5a5a63;
+    --accent: #5aa3ff;
+    --accent-dim: rgba(90, 163, 255, 0.18);
+    --divider: rgba(255, 255, 255, 0.08);
+    --hover: rgba(255, 255, 255, 0.04);
+    --active: rgba(255, 255, 255, 0.08);
+    --stage-bg: #15171b;
+    --range-track: rgba(255, 255, 255, 0.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
   html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Hanken Grotesk', sans-serif; overflow: hidden; }
   #app { position: fixed; inset: 0; display: flex; }
-  #stage { flex: 1; position: relative; cursor: grab; min-width: 0; background: #fafbfd; }
+  #stage { flex: 1; position: relative; cursor: grab; min-width: 0; background: var(--stage-bg); }
+  /* "None" background mode — subtle checkerboard so the user can see
+     transparency. Tokens make it theme-aware: dark theme gets a darker
+     checker. The pattern is constructed in two layers — base color +
+     overlay diamonds — so we don't have to recompute the conic-gradient
+     each theme swap. */
+  #stage.stage-transparent {
+    background:
+      linear-gradient(45deg, var(--divider) 25%, transparent 25%) 0 0/20px 20px,
+      linear-gradient(-45deg, var(--divider) 25%, transparent 25%) 0 10px/20px 20px,
+      var(--stage-bg);
+  }
   #stage:active { cursor: grabbing; }
   #canvas { width: 100%; height: 100%; display: block; }
-  .header { position: absolute; top: 24px; left: 24px; z-index: 10; display: flex; align-items: baseline; gap: 14px; pointer-events: none; }
-  .wordmark { font-family: 'Instrument Serif', serif; font-style: italic; font-size: 28px; letter-spacing: -0.01em; color: var(--text); }
-  .wordmark .dot { color: var(--accent); font-style: normal; }
-  .tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); padding-top: 6px; }
   .actions { position: absolute; top: 24px; right: 24px; z-index: 10; display: flex; gap: 8px; }
   .icon-btn {
     background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -39,15 +69,21 @@
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: all 0.2s ease;
   }
-  .icon-btn:hover { background: rgba(255, 255, 255, 0.95); border-color: rgba(0, 0, 0, 0.12); }
+  .icon-btn:hover { background: var(--active); border-color: var(--panel-border); }
   .icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  /* Theme toggle icon swap. Light theme shows moon ("switch to dark"),
+     dark theme shows sun ("switch to light"). The unused icon is
+     hidden via display:none so it doesn't affect button layout. */
+  .theme-icon-sun { display: none; }
+  [data-theme="dark"] .theme-icon-sun { display: inline; }
+  [data-theme="dark"] .theme-icon-moon { display: none; }
   .primary {
-    background: var(--text); color: white; border: 1px solid var(--text);
+    background: var(--text); color: var(--bg); border: 1px solid var(--text);
     padding: 0 16px; height: 38px; border-radius: 10px;
     font-family: 'Hanken Grotesk', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 0.01em;
     cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s ease;
   }
-  .primary:hover { background: var(--accent); border-color: var(--accent); }
+  .primary:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
   .primary svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
   .export-wrap { position: relative; }
   .export-menu {
@@ -102,13 +138,39 @@
   .panel {
     width: 320px; background: var(--panel);
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-    border-left: 1px solid var(--panel-border);
     overflow-y: auto; padding: 28px 24px 32px; z-index: 5;
     flex-shrink: 0;
   }
+  .panel-left  { border-right: 1px solid var(--panel-border); }
+  .panel-right { border-left:  1px solid var(--panel-border); }
+  .panel-brand {
+    /* Logo unit at the top of the left panel — just the glass tile,
+       which contains the wordmark inside it. Bottom border separates
+       the logo from the first section below. */
+    padding-bottom: 22px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex; align-items: center;
+  }
+  .panel-brand .brandmark {
+    /* Single tilted glass plate. Sized to align visually with the
+       cap-height of the wordmark. */
+    width: 38px; height: 30px; flex-shrink: 0;
+  }
+  .panel-brand .wordmark {
+    /* Italic serif wordmark — Instrument Serif italic, matches the
+       reference image. */
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .panel-brand .wordmark .dot { color: var(--accent); font-style: normal; }
+  .panel-brand .tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); padding-top: 6px; }
   .panel::-webkit-scrollbar { width: 4px; }
   .panel::-webkit-scrollbar-track { background: transparent; }
-  .panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+  .panel::-webkit-scrollbar-thumb { background: var(--range-track); border-radius: 2px; }
   .section { margin-bottom: 26px; }
   .section:last-child { margin-bottom: 0; }
   .section-title {
@@ -116,7 +178,6 @@
     color: var(--text-faint); margin-bottom: 12px;
     display: flex; align-items: center; justify-content: space-between;
   }
-  .section-title .num { color: var(--text-faint); font-size: 9px; }
   .opt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
   .opt {
     aspect-ratio: 1; background: var(--hover);
@@ -140,7 +201,7 @@
   .slider-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
   input[type=range] {
     -webkit-appearance: none; appearance: none;
-    width: 100%; height: 2px; background: rgba(0,0,0,0.1); border-radius: 1px; outline: none;
+    width: 100%; height: 2px; background: var(--range-track); border-radius: 1px; outline: none;
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
@@ -152,6 +213,66 @@
     width: 14px; height: 14px; background: var(--text); border-radius: 50%;
     cursor: pointer; border: none;
   }
+  /* Inner section divider — a thin grey line used between groups
+     within a single section (e.g. color group vs light group inside
+     Material & Light). Uses the same border token as the main
+     between-section dividers, so visual language is consistent. */
+  .inner-divider {
+    height: 1px;
+    background: var(--panel-border);
+    margin: 22px 0 4px;
+  }
+  /* Section divider — a thin grey line placed BETWEEN two `.section`
+     blocks. Since the preceding section already contributes its own
+     `margin-bottom: 26px`, we only add margin BELOW the divider so the
+     line ends up visually centered in the gap between sections. */
+  .section-divider {
+    height: 1px;
+    background: var(--panel-border);
+    margin: 0 0 26px;
+  }
+  /* Light-direction dial — draggable puck on a circle's perimeter.
+     Puck angle (relative to center, measured clockwise from "right")
+     drives state.lightAngle in degrees. */
+  .light-dial-row { margin: 22px 0 22px; }
+  .light-dial-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .light-dial {
+    position: relative;
+    width: 78px; height: 78px;
+    margin: 0 auto;
+    cursor: grab;
+    touch-action: none; /* prevent scrolling while dragging */
+    user-select: none;
+  }
+  .light-dial:active { cursor: grabbing; }
+  .light-dial-track {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.12);
+    background: radial-gradient(circle at center, rgba(0,0,0,0.025), transparent 70%);
+  }
+  .light-dial-center {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 3px; height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .light-dial-puck {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 12px; height: 12px;
+    margin: -6px 0 0 -6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--panel), 0 1px 3px rgba(0,0,0,0.18);
+    /* Position computed by JS via CSS transform. */
+    transform: translate(0, 0);
+    pointer-events: none; /* dial container handles all events */
+    transition: background 0.15s;
+  }
+  .light-dial:hover .light-dial-puck { background: var(--text); }
   .color-row { display: flex; gap: 10px; align-items: center; }
   .color-swatch {
     width: 44px; height: 44px; border-radius: 8px;
@@ -181,15 +302,17 @@
   .divider { height: 1px; background: var(--divider); margin: 0 0 22px; }
   @media (max-width: 720px) {
     #app { flex-direction: column; }
-    .panel { width: 100%; max-height: 50vh; border-left: none; border-top: 1px solid var(--panel-border); }
-    .header { top: 16px; left: 16px; }
+    .panel { width: 100%; max-height: 40vh; }
+    .panel-left  { border-right: none; border-bottom: 1px solid var(--panel-border); }
+    .panel-right { border-left:  none; border-top:    1px solid var(--panel-border); }
+    .panel-brand { margin-bottom: 16px; }
     .actions { top: 16px; right: 16px; }
     .status, .hint { display: none; }
   }
   .loading {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    background: #fafbfd; z-index: 50; transition: opacity 0.5s ease;
+    background: var(--stage-bg); z-index: 50; transition: opacity 0.5s ease;
   }
   .loading.hidden { opacity: 0; pointer-events: none; }
   .loading-text { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); }
@@ -197,13 +320,99 @@
 </head>
 <body>
 <div id="app">
+  <aside class="panel panel-left">
+    <div class="panel-brand">
+      <svg class="brandmark" viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Single tilted glassy plate — the original mark direction
+             from the earlier "this is the one we liked" version.
+             Body gradient, iridescent dispersion corner, top-edge
+             spec, right-edge rim light. -->
+        <defs>
+          <linearGradient id="bm-body" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#dceaff"/>
+            <stop offset="35%"  stop-color="#5aa3ff"/>
+            <stop offset="75%"  stop-color="#2c6fd1"/>
+            <stop offset="100%" stop-color="#1e40af"/>
+          </linearGradient>
+          <linearGradient id="bm-iri" x1="0.55" y1="0.55" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#1e40af" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#6b4ab0" stop-opacity="0.7"/>
+          </linearGradient>
+          <linearGradient id="bm-spec" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="bm-rim" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.7"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(20 16) rotate(-10) translate(-14 -10)">
+          <rect x="0" y="0" width="28" height="20" rx="4" fill="url(#bm-body)"/>
+          <rect x="0" y="0" width="28" height="20" rx="4" fill="url(#bm-iri)"/>
+          <rect x="0" y="0" width="28" height="3"   rx="1.5" fill="url(#bm-spec)"/>
+          <rect x="24" y="0" width="4" height="20"  rx="1.5" fill="url(#bm-rim)"/>
+        </g>
+      </svg>
+      <div class="wordmark">Prism</div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>Material &amp; light</span></div>
+      <div class="color-row" style="margin-bottom: 10px;">
+        <div class="color-swatch" id="colorSwatch">
+          <input type="color" id="color" value="#1e40af" />
+        </div>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint);">Custom color</span>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); margin: 14px 0 10px;">Brand palette</div>
+      <div class="preset-row" id="presetRow" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+        <button class="preset" style="background:#5aa3ff" data-color="#5aa3ff" title="Bright sky"></button>
+        <button class="preset" style="background:#4a90e2" data-color="#4a90e2" title="Vivid"></button>
+        <button class="preset" style="background:#3b82f6" data-color="#3b82f6" title="Royal"></button>
+        <button class="preset" style="background:#2c6fd1" data-color="#2c6fd1" title="Deep"></button>
+        <button class="preset" style="background:#1e40af" data-color="#1e40af" title="Navy"></button>
+      </div>
+      <!-- Divider between the color group (custom + brand palette)
+           and the light-and-material controls below. -->
+      <div class="inner-divider"></div>
+      <!-- Light-direction dial. Drag the puck around the circle's
+           perimeter to pick where the key light falls from. State
+           field is `lightAngle` (degrees, 0–360). -->
+      <div class="light-dial-row">
+        <div class="light-dial-label">
+          <span class="slider-label">Light direction</span>
+          <span class="slider-val" id="valLightAngle">20°</span>
+        </div>
+        <div class="light-dial" id="lightDial" role="slider" tabindex="0" aria-label="Light direction">
+          <div class="light-dial-track"></div>
+          <div class="light-dial-center"></div>
+          <div class="light-dial-puck" id="lightDialPuck"></div>
+        </div>
+      </div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Color depth</span><span class="slider-val" id="valSat">3.50</span></div><input type="range" id="sat" min="20" max="400" value="350" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Refraction</span><span class="slider-val" id="valIor">1.50</span></div><input type="range" id="ior" min="100" max="210" value="150" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Surface polish</span><span class="slider-val" id="valPolish">0.95</span></div><input type="range" id="polish" min="0" max="100" value="95" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Bloom intensity</span><span class="slider-val" id="valBloom">0.20</span></div><input type="range" id="bloom" min="0" max="150" value="20" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Exposure</span><span class="slider-val" id="valExp">0.95</span></div><input type="range" id="exp" min="50" max="200" value="95" /></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>Background</span></div>
+      <div class="bg-row">
+        <button class="bg-opt active" data-bg="light">Light</button>
+        <button class="bg-opt" data-bg="dark">Dark</button>
+        <button class="bg-opt" data-bg="transparent">None</button>
+      </div>
+    </div>
+  </aside>
   <div id="stage">
     <canvas id="canvas"></canvas>
-    <div class="header">
-      <div class="wordmark">Glass<span class="dot">.</span>studio</div>
-      <div class="tag">v 6.0 · polished cores</div>
-    </div>
     <div class="actions">
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">
+        <!-- Sun icon shown in dark theme (click to go light). -->
+        <svg class="theme-icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <!-- Moon icon shown in light theme (click to go dark). -->
+        <svg class="theme-icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
       <button class="icon-btn" id="randomBtn" title="Randomize">
         <svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
       </button>
@@ -230,15 +439,15 @@
     </div>
     <div class="status">
       <span><b>Shape</b><span id="statShape">pill</span></span>
-      <span><b>Form</b><span id="statForm">tower</span></span>
-      <span><b>Count</b><span id="statCount">16</span></span>
+      <span><b>Form</b><span id="statForm">ring</span></span>
+      <span><b>Count</b><span id="statCount">13</span></span>
     </div>
     <div class="hint">Drag · Scroll to zoom</div>
     <div class="loading" id="loading"><div class="loading-text">Compiling shaders…</div></div>
   </div>
-  <aside class="panel">
+  <aside class="panel panel-right">
     <div class="section">
-      <div class="section-title"><span>Shape</span><span class="num">01 / 05</span></div>
+      <div class="section-title"><span>Shape</span></div>
       <div class="opt-grid" id="shapeGrid">
         <button class="opt" data-shape="disc"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="9"/></svg></button>
         <button class="opt active" data-shape="roundedRect"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="4"/></svg></button>
@@ -251,21 +460,23 @@
       </div>
     </div>
     <div class="section">
-      <div class="section-title"><span>Composition</span><span class="num">02 / 05</span></div>
-      <div class="opt-grid" id="compGrid" style="grid-template-columns: repeat(6, 1fr);">
-        <button class="opt" data-comp="spiral"><svg viewBox="0 0 24 24"><path d="M3 12c0-5 4-9 9-9 4 0 7 3 7 7 0 3-2 6-5 6-2 0-4-2-4-4 0-2 1-3 3-3 1 0 2 1 2 2"/></svg></button>
-        <button class="opt" data-comp="twist"><svg viewBox="0 0 24 24"><path d="M6 4l12 4M6 8l12 4M6 12l12 4M6 16l12 4"/></svg></button>
-        <button class="opt active" data-comp="tower"><svg viewBox="0 0 24 24"><path d="M4 4h16M4 9h16M4 14h16M4 19h16"/></svg></button>
+      <div class="section-title"><span>Composition</span></div>
+      <div class="opt-grid" id="compGrid" style="grid-template-columns: repeat(4, 1fr);">
+        <button class="opt" data-comp="tower"><svg viewBox="0 0 24 24"><path d="M4 4h16M4 9h16M4 14h16M4 19h16"/></svg></button>
         <button class="opt" data-comp="scatter"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="1.5"/><circle cx="17" cy="8" r="1.5"/><circle cx="9" cy="15" r="1.5"/><circle cx="18" cy="17" r="1.5"/><circle cx="5" cy="19" r="1.5"/></svg></button>
         <button class="opt" data-comp="grid"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
-        <button class="opt" data-comp="ring"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3M6.3 6.3l2.1 2.1M15.6 15.6l2.1 2.1M6.3 17.7l2.1-2.1M15.6 8.4l2.1-2.1"/></svg></button>
+        <button class="opt active" data-comp="ring"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3M6.3 6.3l2.1 2.1M15.6 15.6l2.1 2.1M6.3 17.7l2.1-2.1M15.6 8.4l2.1-2.1"/></svg></button>
       </div>
-      <div class="opt-labels" id="compLabels" style="grid-template-columns: repeat(6, 1fr);">
-        <span>Spiral</span><span>Twist</span><span class="active">Tower</span><span>Scatter</span><span>Grid</span><span>Ring</span>
+      <div class="opt-labels" id="compLabels" style="grid-template-columns: repeat(4, 1fr);">
+        <span>Tower</span><span>Scatter</span><span>Grid</span><span class="active">Ring</span>
       </div>
     </div>
+    <!-- Divider between Shape+Composition (what the object IS) and
+         Material style+Form parameters (how it BEHAVES). Mirrors the
+         color/light split in the left panel. -->
+    <div class="section-divider"></div>
     <div class="section">
-      <div class="section-title"><span>Material style</span><span class="num">03 / 05</span></div>
+      <div class="section-title"><span>Material style</span></div>
       <div class="style-row">
         <button class="style-opt active" data-style="layered">Layered</button>
         <button class="style-opt" data-style="crystal">Crystal</button>
@@ -273,50 +484,12 @@
       </div>
     </div>
     <div class="section">
-      <div class="section-title"><span>Form parameters</span><span class="num">04 / 05</span></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Element count</span><span class="slider-val" id="valCount">16</span></div><input type="range" id="count" min="3" max="40" value="16" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Twist amount</span><span class="slider-val" id="valTwist">0.8</span></div><input type="range" id="twist" min="0" max="500" value="80" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Scale taper</span><span class="slider-val" id="valTaper">0.20</span></div><input type="range" id="taper" min="0" max="100" value="20" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Spacing</span><span class="slider-val" id="valSpacing">0.50</span></div><input type="range" id="spacing" min="20" max="250" value="50" /></div>
+      <div class="section-title"><span>Form parameters</span></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Element count</span><span class="slider-val" id="valCount">13</span></div><input type="range" id="count" min="3" max="40" value="13" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Twist amount</span><span class="slider-val" id="valTwist">1.7</span></div><input type="range" id="twist" min="0" max="500" value="170" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Scale taper</span><span class="slider-val" id="valTaper">0.15</span></div><input type="range" id="taper" min="0" max="100" value="15" /></div>
+      <div class="slider-row"><div class="slider-head"><span class="slider-label">Spacing</span><span class="slider-val" id="valSpacing">1.20</span></div><input type="range" id="spacing" min="20" max="250" value="120" /></div>
       <div class="slider-row"><div class="slider-head"><span class="slider-label">Thickness</span><span class="slider-val" id="valThick">0.18</span></div><input type="range" id="thick" min="3" max="80" value="18" /></div>
-    </div>
-    <div class="divider"></div>
-    <div class="section">
-      <div class="section-title"><span>Material &amp; light</span><span class="num">05 / 05</span></div>
-      <div class="color-row" style="margin-bottom: 10px;">
-        <div class="color-swatch" id="colorSwatch">
-          <input type="color" id="color" value="#7dafff" />
-        </div>
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint);">Custom color</span>
-      </div>
-      <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); margin: 14px 0 10px;">Brand palette</div>
-      <div class="preset-row" id="presetRow" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
-        <button class="preset" style="background:#e6f1ff" data-color="#e6f1ff" title="Whisper"></button>
-        <button class="preset" style="background:#dceaff" data-color="#dceaff" title="Vapor"></button>
-        <button class="preset" style="background:#cfe4ff" data-color="#cfe4ff" title="Palest ice"></button>
-        <button class="preset" style="background:#bcd6ff" data-color="#bcd6ff" title="Powder"></button>
-        <button class="preset" style="background:#a8ccff" data-color="#a8ccff" title="Pale ice"></button>
-        <button class="preset" style="background:#9cc2f0" data-color="#9cc2f0" title="Cool mist"></button>
-        <button class="preset" style="background:#8ec5ff" data-color="#8ec5ff" title="Light sky"></button>
-        <button class="preset" style="background:#7dafff" data-color="#7dafff" title="Brand"></button>
-        <button class="preset" style="background:#6bb6f0" data-color="#6bb6f0" title="Cyan sky"></button>
-        <button class="preset" style="background:#5aa3ff" data-color="#5aa3ff" title="Bright sky"></button>
-        <button class="preset" style="background:#4a90e2" data-color="#4a90e2" title="Vivid"></button>
-        <button class="preset" style="background:#3b82f6" data-color="#3b82f6" title="Royal"></button>
-        <button class="preset" style="background:#2c6fd1" data-color="#2c6fd1" title="Deep"></button>
-        <button class="preset" style="background:#1e40af" data-color="#1e40af" title="Navy"></button>
-      </div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Color depth</span><span class="slider-val" id="valSat">1.60</span></div><input type="range" id="sat" min="20" max="400" value="160" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Refraction</span><span class="slider-val" id="valIor">1.50</span></div><input type="range" id="ior" min="100" max="210" value="150" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Surface polish</span><span class="slider-val" id="valPolish">0.95</span></div><input type="range" id="polish" min="0" max="100" value="95" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Bloom intensity</span><span class="slider-val" id="valBloom">0.30</span></div><input type="range" id="bloom" min="0" max="150" value="30" /></div>
-      <div class="slider-row"><div class="slider-head"><span class="slider-label">Exposure</span><span class="slider-val" id="valExp">1.05</span></div><input type="range" id="exp" min="50" max="200" value="105" /></div>
-      <div class="section-title" style="margin-top: 22px;">Background</div>
-      <div class="bg-row">
-        <button class="bg-opt active" data-bg="light">Light</button>
-        <button class="bg-opt" data-bg="dark">Dark</button>
-        <button class="bg-opt" data-bg="transparent">None</button>
-      </div>
     </div>
   </aside>
 </div>
@@ -368,21 +541,43 @@
 // =================================================================
 const state = {
   shape: 'roundedRect',
-  comp: 'tower',
+  comp: 'ring',
   matStyle: 'layered',  // dual-mesh core+shell approach
-  count: 16,
-  twist: 0.8,
-  taper: 0.2,
-  spacing: 0.5,
+  count: 13,
+  twist: 1.7,
+  taper: 0.15,
   thickness: 0.18,
-  color: '#7dafff',
-  saturation: 1.6,
+  spacing: 1.2,
+  color: '#1e40af',
+  saturation: 3.5,
   ior: 1.5,
   polish: 0.95,
-  bloom: 0.3,
-  exposure: 1.05,
+  bloom: 0.2,
+  exposure: 0.95,
+  // Key light direction in degrees. 0 = light from the right
+  // (positive X), 90 = from the back (positive Z), 180 = from the
+  // left, 270 = from the front. Drives buildProductStudioEnvironment
+  // to rotate the two side key softboxes around Y. Default keeps
+  // the original layout (key from front-right ≈ 20° tilt).
+  lightAngle: 20,
   background: 'light',
   seed: Math.random() * 1000,
+};
+
+// =================================================================
+// COMPOSITION DEFAULTS — hand-tuned per-composition starting values.
+// Applied whenever the user clicks a composition button. Each entry
+// sets the form parameters to a value that looks good for that layout
+// (no clipping, balanced proportions, etc). Add/edit entries as you
+// dial in each composition.
+//
+// Keys are the same as state.comp values. Each value lists only the
+// state fields that should be overridden — anything missing is left
+// alone. Sliders and labels are updated to match.
+// =================================================================
+const COMP_DEFAULTS = {
+  // tower, scatter, grid: not yet defined — fall back to auto-safe spacing.
+  // ring: keeps its 1.20 default; never auto-overridden.
 };
 
 let renderer, scene, camera, group, envTexture;
@@ -410,7 +605,7 @@ function init() {
   group = new THREE.Group();
   scene.add(group);
 
-  envTexture = buildProductStudioEnvironment(renderer);
+  envTexture = buildProductStudioEnvironment(renderer, state.lightAngle);
   scene.environment = envTexture;
 
   setBackground(state.background);
@@ -431,7 +626,7 @@ function init() {
 // Bright softboxes against mid-tone dome creates the contrast
 // reflections that read as glass.
 // =================================================================
-function buildProductStudioEnvironment(renderer) {
+function buildProductStudioEnvironment(renderer, lightAngleDeg = 20) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
   const envScene = new THREE.Scene();
@@ -486,9 +681,20 @@ function buildProductStudioEnvironment(renderer) {
     envScene.add(mesh);
   }
   // Key softboxes
+  // Top-down stays fixed — without it the scene goes dark from above.
   addPanel(0, 9, 0, 14, 10, 10.0, [1.0, 1.0, 0.98]);
-  addPanel(8, 1, 3, 3, 16, 9.0, [1.0, 0.98, 0.95]);
-  addPanel(-8, 1, -3, 3, 16, 7.0, [0.95, 0.98, 1.0]);
+  // Two opposing side keys orbit around Y based on lightAngleDeg.
+  // The original layout placed them at (8,1,3) and (-8,1,-3), which
+  // corresponds to an angle of ≈20°. Distance from origin is preserved
+  // (sqrt(8² + 3²) ≈ 8.54).
+  const angleRad = lightAngleDeg * Math.PI / 180;
+  const sideDist = 8.54;
+  const kxA = Math.cos(angleRad) * sideDist;
+  const kzA = Math.sin(angleRad) * sideDist;
+  addPanel(kxA,  1,  kzA, 3, 16, 9.0, [1.0, 0.98, 0.95]); // primary side key
+  addPanel(-kxA, 1, -kzA, 3, 16, 7.0, [0.95, 0.98, 1.0]); // opposing fill key
+  // Back fill, top fill, edge fills — kept at fixed positions so the
+  // base ambient doesn't shift around when the user spins the dial.
   addPanel(0, 1, -9, 8, 10, 6.0, [0.92, 0.96, 1.0]);
   addPanel(-4, 0, 8, 4, 5, 2.5, [1.0, 1.0, 1.0]);
   addPanel(5, -2, 7, 3, 4, 2.0, [1.0, 1.0, 1.0]);
@@ -496,6 +702,19 @@ function buildProductStudioEnvironment(renderer) {
   const target = pmrem.fromScene(envScene, 0.04, 0.1, 100);
   pmrem.dispose();
   return target.texture;
+}
+
+// =================================================================
+// Rebuilds the environment map with a new key-light angle and swaps
+// it onto the scene. Disposes the previous texture to avoid GPU
+// memory leaks (PMREM textures aren't tiny — eats RAM if not freed).
+// Called from the light-direction dial as the puck moves.
+// =================================================================
+function rebuildEnvironment() {
+  const oldTex = envTexture;
+  envTexture = buildProductStudioEnvironment(renderer, state.lightAngle);
+  scene.environment = envTexture;
+  if (oldTex) oldTex.dispose();
 }
 
 // =================================================================
@@ -705,36 +924,6 @@ function clearGeometryCache() {
 // =================================================================
 // COMPOSITIONS
 // =================================================================
-function composeSpiral(count, twist, taper, spacing) {
-  const arr = [];
-  const totalHeight = 3.6 * spacing;
-  const orbitRadius = 0.20 * spacing;
-  for (let i = 0; i < count; i++) {
-    const t = count > 1 ? i / (count - 1) : 0.5;
-    const y = (t - 0.5) * totalHeight;
-    const angle = t * Math.PI * twist;
-    const x = Math.cos(angle) * orbitRadius;
-    const z = Math.sin(angle) * orbitRadius;
-    const rotY = angle;
-    const rotX = Math.PI / 2 * 0.88;
-    const s = 1.0 - t * taper * 0.7;
-    arr.push({ position: [x, y, z], rotation: [rotX, rotY, 0], scale: s });
-  }
-  return arr;
-}
-function composeTwist(count, twist, taper, spacing) {
-  const arr = [];
-  const totalLen = 4.2 * spacing;
-  for (let i = 0; i < count; i++) {
-    const t = count > 1 ? i / (count - 1) : 0.5;
-    const y = (t - 0.5) * totalLen;
-    const rotY = Math.sin(t * Math.PI * twist) * Math.PI * 0.6;
-    const rotZ = t * Math.PI * twist * 0.5;
-    const s = 1.0 - Math.abs(t - 0.5) * taper * 1.2;
-    arr.push({ position: [0, y, 0], rotation: [0, rotY, rotZ], scale: s });
-  }
-  return arr;
-}
 function composeTower(count, twist, taper, spacing) {
   // Tilted-stack tower — matches the reference composition
   const arr = [];
@@ -836,6 +1025,60 @@ function mulberry32(a) {
 }
 
 // =================================================================
+// SAFE SPACING — returns the minimum spacing where adjacent plates
+// don't visibly clip into each other, given the current composition,
+// shape, count, thickness, and twist. Used ONLY when switching
+// compositions (to set a sensible default for the new layout) —
+// NOT applied per frame, so the spacing slider remains fully usable
+// after the switch. Ring keeps its own default and is excluded.
+// =================================================================
+function plateExtents(shape) {
+  // Approximate in-plane footprint of a plate at scale 1.0. Mirrors
+  // the hard-coded base sizes in getGeometry().
+  if (shape === 'disc') return { long: 1.9, short: 1.9 };
+  if (shape === 'roundedRect' || shape === 'rect') return { long: 1.7, short: 1.05 };
+  return { long: 1.25, short: 1.25 }; // square / roundedSquare
+}
+
+function getMinSafeSpacing(state) {
+  const { long: pL, short: pS } = plateExtents(state.shape);
+  const th = state.thickness;
+  const n = Math.max(2, state.count);
+  const margin = 0.08; // small visual buffer so plates don't kiss exactly
+
+  if (state.comp === 'tower') {
+    // composeTower: constant forward tilt tiltX = 0.25 rad. Y-projected
+    // extent = thickness*cos(tilt) + plateShort*sin(tilt). Plate's short
+    // axis is the one that rotates into Y when a pill lies flat tilted
+    // forward, so use pS.
+    const tilt = 0.25;
+    const projExtent = th * Math.cos(tilt) + pS * Math.sin(tilt);
+    const requiredGap = projExtent + margin;
+    return (requiredGap * (n - 1)) / 3.4;
+  }
+
+  if (state.comp === 'grid') {
+    // composeGrid: cellW = cellH = 1.15 * spacing. Largest in-plane
+    // footprint is plateLong * scale, where composeGrid's max scale
+    // ≈ 0.9 (0.7 - taper*0.3 + rng*0.2).
+    const requiredCell = pL * 0.9 + margin;
+    return requiredCell / 1.15;
+  }
+
+  if (state.comp === 'scatter') {
+    // composeScatter: random placement in a stretched box of side
+    // proportional to spacing. Approximate the spacing needed by
+    // ensuring each plate has ~3x its own volume of placement room.
+    const plateVol = pL * pS * Math.max(th, 0.15) * Math.pow(0.75, 3);
+    const requiredVol = plateVol * 3 * n;
+    return Math.cbrt(requiredVol / 19.7); // 19.7 = (3.64 * 2.6 * 2.08), the box volume coefficient
+  }
+
+  // ring / anything else — caller already excluded these
+  return state.spacing;
+}
+
+// =================================================================
 // REBUILD — creates CORE + SHELL pair per plate when in layered mode
 // =================================================================
 function rebuild() {
@@ -850,8 +1093,6 @@ function rebuild() {
   const geo = getGeometry(state.shape, state.thickness);
   let transforms;
   switch (state.comp) {
-    case 'spiral': transforms = composeSpiral(state.count, state.twist, state.taper, state.spacing); break;
-    case 'twist': transforms = composeTwist(state.count, state.twist, state.taper, state.spacing); break;
     case 'tower': transforms = composeTower(state.count, state.twist, state.taper, state.spacing); break;
     case 'scatter': transforms = composeScatter(state.count, state.twist, state.taper, state.spacing, state.seed); break;
     case 'grid': transforms = composeGrid(state.count, state.twist, state.taper, state.spacing, state.seed); break;
@@ -899,6 +1140,10 @@ function frameComposition() {
 let cameraInitialized = false;
 
 function setBackground(mode) {
+  // Note: the 3D scene background is INDEPENDENT from the UI theme.
+  // This setting controls only the canvas backdrop the rendered glass
+  // sits against. UI chrome (panels, text) follows the theme toggle.
+  stage.classList.remove('stage-transparent');
   if (mode === 'light') {
     scene.background = new THREE.Color(0xfafbfd);
     renderer.setClearColor(0xfafbfd, 1);
@@ -910,7 +1155,9 @@ function setBackground(mode) {
   } else {
     scene.background = null;
     renderer.setClearColor(0x000000, 0);
-    stage.style.background = 'conic-gradient(from 45deg at 10px 10px, #f0f0f4 90deg, #fafbfd 90deg 180deg, #f0f0f4 180deg 270deg, #fafbfd 270deg) 0 0/20px 20px';
+    // Checkerboard is themed via CSS class so dark UI gets dark check
+    stage.style.background = '';
+    stage.classList.add('stage-transparent');
   }
 }
 
@@ -944,7 +1191,7 @@ function setupControls() {
   rotX = targetRotX;
   rotY = targetRotY;
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest('.actions') || e.target.closest('.header')) return;
+    if (e.target.closest('.actions')) return;
     isDragging = true; lastX = e.clientX; lastY = e.clientY;
     stage.setPointerCapture(e.pointerId);
   });
@@ -1000,6 +1247,90 @@ function animate() {
 // UI
 // =================================================================
 function bindUI() {
+  // ===== Theme toggle (light / dark) =====
+  // Flips data-theme on <html>. All UI colors are token-driven so the
+  // whole interface retints in one frame. Independent from the 3D
+  // scene's background (which has its own Light/Dark/None toggle).
+  const themeBtn = document.getElementById('themeBtn');
+  themeBtn.addEventListener('click', () => {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    if (next === 'light') {
+      html.removeAttribute('data-theme');
+    } else {
+      html.setAttribute('data-theme', 'dark');
+    }
+  });
+
+  // ===== Light-direction dial =====
+  // Drag the puck around the circle's perimeter to set state.lightAngle
+  // (degrees, 0–360). Rebuilds the PMREM environment on change. PMREM
+  // is expensive (~5-15ms on M-series, more on integrated GPUs), so
+  // env rebuilds are throttled to ~30 fps while dragging via rAF.
+  const dial = document.getElementById('lightDial');
+  const puck = document.getElementById('lightDialPuck');
+  const angleVal = document.getElementById('valLightAngle');
+
+  // Visual radius the puck travels on. Slightly inside the track edge
+  // so the puck sits ON the circle rather than overhanging it.
+  const puckRadius = 30;
+  let envRebuildPending = false;
+
+  function renderPuck(angleDeg) {
+    // SVG-style angle: 0° = 3 o'clock (right), increases clockwise as we
+    // go down. Standard math: x = cos(θ), y = sin(θ).
+    const r = angleDeg * Math.PI / 180;
+    const x = Math.cos(r) * puckRadius;
+    const y = Math.sin(r) * puckRadius;
+    puck.style.transform = `translate(${x}px, ${y}px)`;
+    angleVal.textContent = `${Math.round(((angleDeg % 360) + 360) % 360)}°`;
+  }
+
+  function scheduleEnvRebuild() {
+    if (envRebuildPending) return;
+    envRebuildPending = true;
+    requestAnimationFrame(() => {
+      envRebuildPending = false;
+      rebuildEnvironment();
+    });
+  }
+
+  let dragging = false;
+  function updateFromPointer(clientX, clientY) {
+    const rect = dial.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    // atan2 returns radians in (-π, π]. Convert to 0–360 degrees,
+    // clockwise from positive X (3 o'clock).
+    let deg = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (deg < 0) deg += 360;
+    state.lightAngle = deg;
+    renderPuck(deg);
+    scheduleEnvRebuild();
+  }
+
+  dial.addEventListener('pointerdown', e => {
+    dragging = true;
+    dial.setPointerCapture(e.pointerId);
+    updateFromPointer(e.clientX, e.clientY);
+  });
+  dial.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    updateFromPointer(e.clientX, e.clientY);
+  });
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    try { dial.releasePointerCapture(e.pointerId); } catch {}
+  };
+  dial.addEventListener('pointerup', endDrag);
+  dial.addEventListener('pointercancel', endDrag);
+
+  // Initial puck placement reflects the default state.lightAngle.
+  renderPuck(state.lightAngle);
+
   const shapeBtns = document.querySelectorAll('#shapeGrid .opt');
   const shapeLabels = document.querySelectorAll('#shapeLabels span');
   shapeBtns.forEach((btn, i) => {
@@ -1023,6 +1354,28 @@ function bindUI() {
       compLabels[i].classList.add('active');
       state.comp = btn.dataset.comp;
       document.getElementById('statForm').textContent = compLabels[i].textContent.toLowerCase();
+
+      // ---- Apply composition preset (if defined) ----
+      // Each composition can have its own hand-tuned starting values
+      // (see COMP_DEFAULTS at the top of this script). When the user
+      // picks a comp that has a preset, copy those values into state
+      // and sync the slider knobs + labels. If no preset is defined,
+      // fall back to the auto-safe-spacing heuristic so plates still
+      // don't clip on the new layout. Ring is excluded from both paths
+      // — it keeps whatever spacing is already set (default 1.20).
+      const preset = COMP_DEFAULTS[state.comp];
+      if (preset) {
+        applyCompPreset(preset);
+      } else if (state.comp !== 'ring') {
+        const safe = getMinSafeSpacing(state);
+        if (safe > state.spacing) {
+          const sliderVal = Math.max(20, Math.min(250, Math.round(safe * 100)));
+          document.getElementById('spacing').value = sliderVal;
+          state.spacing = sliderVal / 100;
+          document.getElementById('valSpacing').textContent = state.spacing.toFixed(2);
+        }
+      }
+
       cameraInitialized = false;
       rebuild();
     });
@@ -1158,9 +1511,51 @@ function bindSlider(id, parse, valId, format, statId, statFmt, opts = {}) {
   });
 }
 
+// =================================================================
+// APPLY COMPOSITION PRESET — copies a preset object onto state, then
+// syncs each affected slider's knob position and numeric label so the
+// UI matches what's in state. Triggers material/geometry rebuilds only
+// for the fields that need them (thickness clears the geometry cache,
+// the rest are pure layout params handled by the outer rebuild()).
+// =================================================================
+function applyCompPreset(preset) {
+  // Map state-field name -> the slider DOM IDs ({slider, value-label}).
+  // Mirrors bindSlider's keyMap but in the other direction.
+  const fieldSliderMap = {
+    count:     { id: 'count',   valId: 'valCount',   integer: true, statId: 'statCount' },
+    twist:     { id: 'twist',   valId: 'valTwist',   format: v => v.toFixed(1) },
+    taper:     { id: 'taper',   valId: 'valTaper',   format: v => v.toFixed(2) },
+    spacing:   { id: 'spacing', valId: 'valSpacing', format: v => v.toFixed(2) },
+    thickness: { id: 'thick',   valId: 'valThick',   format: v => v.toFixed(2), rebuildGeo: true },
+  };
+  let needsGeoRebuild = false;
+  for (const [field, val] of Object.entries(preset)) {
+    state[field] = val;
+    const map = fieldSliderMap[field];
+    if (!map) continue;
+    const slider = document.getElementById(map.id);
+    if (slider) {
+      // Slider stores integers (×100 for floats, raw for count)
+      slider.value = map.integer ? val : Math.round(val * 100);
+    }
+    const valEl = document.getElementById(map.valId);
+    if (valEl) {
+      valEl.textContent = map.integer ? String(val) : map.format(val);
+    }
+    if (map.statId) {
+      const statEl = document.getElementById(map.statId);
+      if (statEl) statEl.textContent = String(val);
+    }
+    if (map.rebuildGeo) needsGeoRebuild = true;
+  }
+  if (needsGeoRebuild) {
+    clearGeometryCache();
+  }
+}
+
 function randomize() {
   const shapes = ['disc', 'roundedRect', 'rect', 'square', 'roundedSquare'];
-  const comps = ['spiral', 'twist', 'tower', 'scatter', 'grid', 'ring'];
+  const comps = ['tower', 'scatter', 'grid', 'ring'];
   state.shape = shapes[Math.floor(Math.random() * shapes.length)];
   state.comp = comps[Math.floor(Math.random() * comps.length)];
   state.count = 8 + Math.floor(Math.random() * 20);

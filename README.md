@@ -1,78 +1,109 @@
-# Glass Studio
+# Prism
 
-A browser-based generator for translucent glass form imagery — built for brand and marketing teams to create on-brand 3D visuals without leaving the browser.
+Browser-based brand imagery generator. Produces abstract translucent glass forms — fanned rings, stacks, scatters, and grids — rendered in real-time WebGL with photorealistic glass material.
 
-Real WebGL rendering with refraction, attenuation, anisotropy, iridescence, and bloom post-processing. No build step, no dependencies beyond the Three.js CDN.
+Single self-contained `index.html`. No build step. Three.js loaded from CDN.
 
-## Live demo
+---
 
-After deploying, your studio will be available at:
+## Deploy to GitHub Pages
 
-```
-https://<your-username>.github.io/<repo-name>/
-```
+### One-time setup
 
-## Features
+1. **Create a new repository on GitHub** (public, or private on a paid plan).
 
-- **5 shapes**: disc, pill (rounded rectangle), rectangle, square, rounded square
-- **6 compositions**: spiral, twist, tower, scatter, grid, ring
-- **3 material styles**: layered (default — core+shell for inter-plate refraction), crystal (chunky polished), frosted (lightly etched)
-- **14-step brand-blue palette** plus a free custom color picker
-- **Slider controls** for element count, twist, taper, spacing, thickness, color depth, refraction (IOR), polish, bloom intensity, and exposure
-- **Drag to orbit**, scroll to zoom, randomize button for ideation
-- **PNG export** at HD / QHD / 4K / 8K landscape, HD / 4K portrait, or 2K / 4K square — with aspect-correct camera reframing
-
-## Deploying to GitHub Pages
-
-### Option A — push to a new repo
-
-1. Create a new repository on GitHub (public or private with Pages enabled).
-2. Clone it locally and copy this `index.html` into the root.
-3. Commit and push:
+2. **Upload these files to the repo.** Either drag-and-drop in the GitHub web UI, or push from your machine:
 
    ```bash
-   git add index.html README.md
-   git commit -m "Deploy Glass Studio"
-   git push origin main
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/<your-username>/<your-repo>.git
+   git push -u origin main
    ```
 
-4. In the repo on GitHub: **Settings → Pages**. Under "Source", choose **Deploy from a branch**, pick `main` and `/ (root)`, click Save.
-5. Wait ~30 seconds. The URL appears at the top of the Pages settings page.
+3. **Enable GitHub Pages** in repo settings:
+   - Go to **Settings** → **Pages**
+   - Under **Source**, select **GitHub Actions**
+   - Save.
 
-### Option B — upload via the GitHub web UI (no command line)
+4. **Wait for the first deploy.** Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and publishes. You can watch progress under the **Actions** tab.
 
-1. Create a new repository on GitHub.
-2. On the empty-repo page, click **uploading an existing file**.
-3. Drag `index.html` and `README.md` into the upload zone.
-4. Commit directly to `main`.
-5. Go to **Settings → Pages**, set source to `main` / `/ (root)`, save.
+5. **Open your site** at:
+   `https://<your-username>.github.io/<your-repo>/`
+
+Subsequent pushes to `main` redeploy automatically.
+
+---
 
 ## Local preview
 
-The file works directly from disk in any modern browser — just open `index.html`. For best results (some browsers restrict `file://` for ES modules), use any static server:
+Just open `index.html` in a browser. No server needed — it's pure HTML/JS, modules loaded from CDN.
+
+If your browser blocks ES modules from `file://` URLs (some configurations do), serve it with any static server:
 
 ```bash
 # Python 3
 python3 -m http.server 8000
 
-# Node.js
+# Node
 npx serve .
 ```
 
-Then open `http://localhost:8000`.
+Then visit `http://localhost:8000`.
+
+---
+
+## What's in the package
+
+```
+prism/
+├── index.html              ← the whole app
+├── README.md               ← this file
+├── .gitignore
+├── .nojekyll               ← stops GitHub Pages from running Jekyll
+└── .github/workflows/
+    └── deploy.yml          ← auto-deploys to Pages on push to main
+```
+
+The `.nojekyll` file is required. Without it, GitHub Pages tries to process the site through Jekyll, which will silently break files and folders starting with underscores.
+
+---
+
+## Using the app
+
+- **Left panel** — Material & Light (color picker, brand palette, light-direction dial, color depth, refraction, polish, bloom, exposure) and Background.
+- **Middle** — 3D viewport. Drag to orbit, scroll to zoom.
+- **Right panel** — Shape (5 options), Composition (4 layouts), Material style, Form parameters.
+- **Top-right** — Theme toggle (light / dark UI), Randomize, and Export (PNG, 8 resolutions from HD to 8K).
+
+The light-direction dial controls where the key softbox falls from — drag the puck around the circle to reposition the harsh side lighting.
+
+Each composition has its own tuned defaults — clicking Tower, Scatter, etc. auto-adjusts sliders to a look that doesn't clip. Sliders stay usable afterwards for fine-tuning.
+
+---
 
 ## Browser support
 
-Requires a browser with WebGL 2 and ES module support. Tested on Chrome, Edge, Safari, and Firefox (last two major versions of each). Mobile Safari and Chrome Android work but performance scales with the device — drop the element count slider on lower-end hardware.
+- **Chrome / Edge / Brave / Arc** — full support
+- **Firefox** — full support
+- **Safari 16+** — full support
+- **Mobile** — works but plate count should be reduced on low-end devices
+
+WebGL2 and ES2020 modules required.
+
+---
 
 ## Tech notes
 
-- Three.js r160 loaded via ES module from `jsdelivr` (with `unpkg` fallback baked in)
-- `MeshPhysicalMaterial` with `transmission`, `attenuationColor`, `iridescence`, `anisotropy`, and (where supported) `dispersion`
-- Procedural studio environment baked via `PMREMGenerator` — no external HDR needed
-- `UnrealBloomPass` post-processing for highlight glow
-- Core + shell dual-mesh technique so each glass plate visibly refracts the other plates around it
+- **No backend.** Everything runs in the browser.
+- **No persistence.** Each session starts fresh.
+- **No analytics, no tracking.** Pure static HTML.
+- **Three.js r160** loaded from jsDelivr with unpkg fallback.
+
+---
 
 ## License
 
-Add a license file (MIT, Apache 2.0, etc.) before publishing if you intend others to reuse this.
+Add your own — this scaffold is yours to modify.
