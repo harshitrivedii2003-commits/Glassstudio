@@ -299,6 +299,35 @@
   }
   .style-opt:hover, .bg-opt:hover { color: var(--text); background: var(--active); }
   .style-opt.active, .bg-opt.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  /* Animation toggles — full-width pill buttons with name on left,
+     on/off state on right. Styled like .style-opt but designed for
+     stacking rather than a horizontal row. */
+  .anim-row { display: flex; flex-direction: column; gap: 6px; }
+  .anim-toggle {
+    height: 36px; padding: 0 14px;
+    background: var(--hover);
+    border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: all 0.15s ease;
+  }
+  .anim-name {
+    font-size: 13px; color: var(--text-dim); font-weight: 400;
+    transition: color 0.15s ease;
+  }
+  .anim-state {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-faint);
+    transition: color 0.15s ease;
+  }
+  .anim-toggle:hover { background: var(--active); }
+  .anim-toggle:hover .anim-name { color: var(--text); }
+  .anim-toggle.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .anim-toggle.active .anim-name { color: var(--accent); font-weight: 500; }
+  .anim-toggle.active .anim-state { color: var(--accent); }
   .divider { height: 1px; background: var(--divider); margin: 0 0 22px; }
   @media (max-width: 720px) {
     #app { flex-direction: column; }
@@ -491,6 +520,39 @@
       <div class="slider-row"><div class="slider-head"><span class="slider-label">Spacing</span><span class="slider-val" id="valSpacing">1.20</span></div><input type="range" id="spacing" min="20" max="250" value="120" /></div>
       <div class="slider-row"><div class="slider-head"><span class="slider-label">Thickness</span><span class="slider-val" id="valThick">0.18</span></div><input type="range" id="thick" min="3" max="80" value="18" /></div>
     </div>
+    <!-- Divider between Form parameters (the static look of one frame)
+         and Animation (how that look moves over time). -->
+    <div class="section-divider"></div>
+    <div class="section">
+      <div class="section-title"><span>Animation</span></div>
+      <!-- Three independent on/off toggles. Multiple can be active at
+           once — e.g. Rotate + Float = orbiting & bobbing. -->
+      <div class="anim-row">
+        <button class="anim-toggle" data-anim="animTumble">
+          <span class="anim-name">Tumble</span>
+          <span class="anim-state">Off</span>
+        </button>
+        <button class="anim-toggle" data-anim="animRotate">
+          <span class="anim-name">Rotate</span>
+          <span class="anim-state">Off</span>
+        </button>
+        <button class="anim-toggle" data-anim="animFloat">
+          <span class="anim-name">Float</span>
+          <span class="anim-state">Off</span>
+        </button>
+        <button class="anim-toggle" data-anim="animWave">
+          <span class="anim-name">Wave</span>
+          <span class="anim-state">Off</span>
+        </button>
+      </div>
+      <div class="slider-row" style="margin-top: 14px;">
+        <div class="slider-head">
+          <span class="slider-label">Speed</span>
+          <span class="slider-val" id="valAnimSpeed">1.0×</span>
+        </div>
+        <input type="range" id="animSpeed" min="10" max="300" value="100" />
+      </div>
+    </div>
   </aside>
 </div>
 
@@ -561,6 +623,18 @@ const state = {
   // the original layout (key from front-right ≈ 20° tilt).
   lightAngle: 20,
   background: 'light',
+  // Animation toggles + global speed multiplier. Each animation
+  // type is independent on/off; speed scales all active types.
+  // Speed 1.0 = baseline (slow & subtle), 0.1 = barely moving,
+  // 3.0 = fast. Animations are applied to the `group` transform
+  // each frame in applyAnimations() — base position/rotation/scale
+  // are restored when an animation is toggled off so they don't
+  // drift over time.
+  animRotate: false,
+  animFloat: false,
+  animWave: false,
+  animTumble: false,
+  animSpeed: 1.0,
   seed: Math.random() * 1000,
 };
 
@@ -1116,6 +1190,10 @@ function rebuild() {
     container.add(shell);
 
     container.position.fromArray(t.position);
+    // Cache base Y + base rotation for animation offsets — applyAnimations()
+    // reads these each frame so animations don't drift over time.
+    container.userData.baseY = t.position[1];
+    container.userData.baseRot = [t.rotation[0], t.rotation[1], t.rotation[2]];
     // Default rotation order is XYZ; ring composition needs ZYX. Set it
     // explicitly on every container so the order can never leak between
     // composition switches.
@@ -1235,9 +1313,100 @@ function resize() {
 window.addEventListener('resize', resize);
 
 let renderPaused = false;
+// =================================================================
+// ANIMATIONS — applied each frame.
+//
+// Rotate + Float operate on the GROUP transform (whole stack moves).
+// Wave operates on individual PLATE containers within the group
+// (each plate moves slightly delayed from its neighbor, creating a
+// traveling ripple through the stack).
+//
+// All animations are ADDITIVE around stable bases:
+//  - group.position/rotation/scale reset to 0/0/1 when their toggle
+//    is off
+//  - per-plate Y resets to container.userData.baseY (cached at
+//    rebuild time) when Wave is off
+// =================================================================
+const animStartTime = performance.now();
+function applyAnimations() {
+  if (!group) return;
+  const anyGroupAnim = state.animRotate || state.animFloat;
+  // Seconds since the page loaded, scaled by user-controlled speed.
+  const t = (performance.now() - animStartTime) / 1000 * state.animSpeed;
+
+  // ---- Group-level animations (Rotate, Float) ----
+  group.rotation.y = state.animRotate ? t * 0.45 : 0;
+  group.position.y = state.animFloat  ? Math.sin(t * 1.8) * 0.15 : 0;
+  // Group scale stays at 1 — breathe is gone, wave handles its own
+  // per-plate transform instead.
+  if (!anyGroupAnim) {
+    group.rotation.y = 0;
+    group.position.y = 0;
+  }
+
+  // ---- Wave: per-plate staggered Y motion ----
+  // Each plate is offset by a phase based on its index so the wave
+  // appears to travel through the stack. Amplitude is small enough to
+  // read as a ripple, not chaos.
+  const plates = group.children;
+  if (state.animWave) {
+    const amp = 0.18;
+    // Phase step per plate. PI/3 ≈ 60° apart, gives a smooth
+    // visible wave across ~6 plates per full cycle. Scales gently
+    // with count so really long stacks don't smear into a blur.
+    const phaseStep = Math.PI / 3;
+    for (let i = 0; i < plates.length; i++) {
+      const p = plates[i];
+      if (p.userData.baseY === undefined) continue;
+      p.position.y = p.userData.baseY + Math.sin(t * 2.0 - i * phaseStep) * amp;
+    }
+  } else {
+    // Restore base Y so plates snap back when wave toggles off.
+    for (let i = 0; i < plates.length; i++) {
+      const p = plates[i];
+      if (p.userData.baseY === undefined) continue;
+      p.position.y = p.userData.baseY;
+    }
+  }
+
+  // ---- Tumble: the whole ring rotates around its own axis (Z, the
+  // axis the ring lies in). Plates keep their fixed pitch relative to
+  // the ring, so as the ring turns each plate travels through the same
+  // poses its neighbor just had — they move in SYNC (one rigid spin)
+  // yet each plate appears to flip through edge-on as it passes the
+  // top. This matches the reference: synchronized, but every plate
+  // reads as moving separately.
+  if (state.animTumble) {
+    // Continuous in-plane spin. Applied to the whole group around Z.
+    // ~one full ring revolution every ~12s at speed 1.0.
+    group.rotation.z = t * 0.52;
+    // Per-plate rotations are NOT touched — they keep their base pose,
+    // so the only motion is the rigid ring spin. Restore base rotation
+    // on each plate in case a previous frame's tumble (old behavior)
+    // left them rotated.
+    for (let i = 0; i < plates.length; i++) {
+      const p = plates[i];
+      const base = p.userData.baseRot;
+      if (!base) continue;
+      p.rotation.set(base[0], base[1], base[2]);
+    }
+  } else {
+    // Reset the ring's Z spin and restore each plate's base rotation
+    // when tumble is off.
+    group.rotation.z = 0;
+    for (let i = 0; i < plates.length; i++) {
+      const p = plates[i];
+      const base = p.userData.baseRot;
+      if (!base) continue;
+      p.rotation.set(base[0], base[1], base[2]);
+    }
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   if (renderPaused) return;
+  applyAnimations();
   updateCamera();
   if (composer) composer.render();
   else renderer.render(scene, camera);
@@ -1390,6 +1559,21 @@ function bindUI() {
     });
   });
 
+  // ===== Animation toggles =====
+  // Three independent on/off buttons (Rotate / Float / Wave). Each
+  // flips its state.anim* boolean and updates the button's visual state
+  // and "Off/On" label. The animate() loop reads these every frame via
+  // applyAnimations(); no rebuild needed.
+  document.querySelectorAll('.anim-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.anim;
+      const next = !state[key];
+      state[key] = next;
+      btn.classList.toggle('active', next);
+      btn.querySelector('.anim-state').textContent = next ? 'On' : 'Off';
+    });
+  });
+
   bindSlider('count', v => parseInt(v), 'valCount', v => v, 'statCount', v => v);
   bindSlider('twist', v => parseFloat(v) / 100, 'valTwist', v => v.toFixed(1));
   bindSlider('taper', v => parseFloat(v) / 100, 'valTaper', v => v.toFixed(2));
@@ -1400,6 +1584,7 @@ function bindUI() {
   bindSlider('polish', v => parseFloat(v) / 100, 'valPolish', v => v.toFixed(2), null, null, { matLive: true });
   bindSlider('bloom', v => parseFloat(v) / 100, 'valBloom', v => v.toFixed(2), null, null, { bloomOnly: true });
   bindSlider('exp', v => parseFloat(v) / 100, 'valExp', v => v.toFixed(2), null, null, { expo: true });
+  bindSlider('animSpeed', v => parseFloat(v) / 100, 'valAnimSpeed', v => v.toFixed(1) + '×', null, null, { animOnly: true });
 
   const colorInput = document.getElementById('color');
   const colorSwatch = document.getElementById('colorSwatch');
@@ -1489,7 +1674,7 @@ function bindSlider(id, parse, valId, format, statId, statFmt, opts = {}) {
   const keyMap = {
     count: 'count', twist: 'twist', taper: 'taper', spacing: 'spacing',
     thick: 'thickness', sat: 'saturation', ior: 'ior', polish: 'polish',
-    bloom: 'bloom', exp: 'exposure'
+    bloom: 'bloom', exp: 'exposure', animSpeed: 'animSpeed'
   };
   el.addEventListener('input', e => {
     const v = parse(e.target.value);
@@ -1505,6 +1690,9 @@ function bindSlider(id, parse, valId, format, statId, statFmt, opts = {}) {
       rebuild();
     } else if (opts.matLive) {
       updateMaterialsLive();
+    } else if (opts.animOnly) {
+      // animSpeed only affects the per-frame animation math — no
+      // mesh or material rebuild needed.
     } else {
       rebuild();
     }
